@@ -3,11 +3,10 @@
 # 
 # Please fill out the the group name, number, members and optionally the name below.
 # 
-# **Group number**: \
-# **Group member 1**: \
-# **Group member 2**: \
-# **Group member 3**: \
-# **Group name (optional)**: 
+# **Group number**:  40 \
+# **Group member 1**: Tor Erik Aasestad\
+# **Group member 2**: Tage Andersen \
+# **Group member 3**:  Elias Hartmarks \
 # 
 # 
 # # Assignment Submission
@@ -59,6 +58,7 @@
 
 # %%
 import time
+import os
 from tqdm import tqdm # Cool progress bar
 
 import numpy as np
@@ -106,8 +106,39 @@ print('X_train shape:', X_train.shape, 'y_train shape:', y_train.shape, X_test.s
 # Plot a few samples images and masks. Feel free to visualize any other aspects of the dataset that you feel are relevant. 
 
 # %%
-# plot a few sambles and masks from the training set
+def plot_samples(X, y, num_samples=5):
+    """Visualize sample images and their corresponding masks."""
 
+    fig, ax = plt.subplots(num_samples, 2, figsize=(10, num_samples * 5))
+
+    for i in range(num_samples):
+        ax[i, 0].imshow(X[i, ...], cmap='gray')
+        ax[i, 0].axis('off')
+        ax[i, 0].set_title(f"Sample {i+1}")
+
+        ax[i, 1].imshow(y[i, ...], cmap='gray') 
+        ax[i, 1].axis('off')
+        ax[i, 1].set_title(f"Mask {i+1}")
+
+    plt.tight_layout()
+    plt.show()
+
+plot_samples(X_train, y_train)
+
+
+# %%
+# Flatten y_train to make it 1D and then get unique counts
+unique_labels, counts = np.unique(y_train, return_counts=True)
+
+# Plot the distribution
+fig, ax = plt.subplots(1, 1, figsize=(12, 3))
+sns.barplot(x=unique_labels, y=counts, ax=ax)
+
+ax.set_xlabel('Label')
+ax.set_ylabel('Label count')
+ax.set_title('Label distribution in Train')
+fig.tight_layout()
+plt.show()
 
 # %% [markdown]
 # # Preprocessing
@@ -115,6 +146,12 @@ print('X_train shape:', X_train.shape, 'y_train shape:', y_train.shape, X_test.s
 # Preprocess the dataset in whatever ways you think are helpful. 
 
 # %%
+# Find the maximum pixel value from the training data
+max_pixel_value = np.max(X_train)
+
+# Normalize the images to [0,1] using the max pixel value from the training data
+X_train = X_train.astype("float32") / max_pixel_value
+X_test = X_test.astype("float32") / max_pixel_value
 
 
 # %% [markdown]
@@ -156,119 +193,45 @@ print('X_train shape:', X_train.shape, 'y_train shape:', y_train.shape, X_test.s
 # 
 
 # %%
-"""
-Version of U-Net with dropout and size preservation (padding= 'same')
-""" 
-def conv2d_block(input_tensor, n_filters, kernel_size = 3, batchnorm = True):
-    """Function to add 2 convolutional layers with the parameters passed to it"""
-    # first layer
-    x = Conv2D(filters = n_filters, kernel_size = (kernel_size, kernel_size),\
-              kernel_initializer = 'he_normal', padding = 'same')(input_tensor)
-    if batchnorm:
-        x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    
-    # second layer
-    x = Conv2D(filters = n_filters, kernel_size = (kernel_size, kernel_size),\
-              kernel_initializer = 'he_normal', padding = 'same')(x)
-    if batchnorm:
-        x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    
-    return x
-
-
-def get_unet(input_img, n_filters = 16, dropout = 0.1, batchnorm = True, n_classes = 2):
-    # Contracting Path
-    c1 = conv2d_block(input_img, n_filters * 1, kernel_size = 3, batchnorm = batchnorm)
-    p1 = MaxPooling2D((2, 2))(c1)
-    p1 = Dropout(dropout)(p1)
-    
-    c2 = conv2d_block(p1, n_filters * 2, kernel_size = 3, batchnorm = batchnorm)
-    p2 = MaxPooling2D((2, 2))(c2)
-    p2 = Dropout(dropout)(p2)
-    
-    c3 = conv2d_block(p2, n_filters * 4, kernel_size = 3, batchnorm = batchnorm)
-    p3 = MaxPooling2D((2, 2))(c3)
-    p3 = Dropout(dropout)(p3)
-    
-    c4 = conv2d_block(p3, n_filters * 8, kernel_size = 3, batchnorm = batchnorm)
-    p4 = MaxPooling2D((2, 2))(c4)
-    p4 = Dropout(dropout)(p4)
-    
-    c5 = conv2d_block(p4, n_filters = n_filters * 16, kernel_size = 3, batchnorm = batchnorm)
-    
-    # Expansive Path
-    u6 = Conv2DTranspose(n_filters * 8, (3, 3), strides = (2, 2), padding = 'same')(c5)
-    u6 = concatenate([u6, c4])
-    u6 = Dropout(dropout)(u6)
-    c6 = conv2d_block(u6, n_filters * 8, kernel_size = 3, batchnorm = batchnorm)
-    
-    u7 = Conv2DTranspose(n_filters * 4, (3, 3), strides = (2, 2), padding = 'same')(c6)
-    u7 = concatenate([u7, c3])
-    u7 = Dropout(dropout)(u7)
-    c7 = conv2d_block(u7, n_filters * 4, kernel_size = 3, batchnorm = batchnorm)
-    
-    u8 = Conv2DTranspose(n_filters * 2, (3, 3), strides = (2, 2), padding = 'same')(c7)
-    u8 = concatenate([u8, c2])
-    u8 = Dropout(dropout)(u8)
-    c8 = conv2d_block(u8, n_filters * 2, kernel_size = 3, batchnorm = batchnorm)
-    
-    u9 = Conv2DTranspose(n_filters * 1, (3, 3), strides = (2, 2), padding = 'same')(c8)
-    u9 = concatenate([u9, c1])
-    u9 = Dropout(dropout)(u9)
-    c9 = conv2d_block(u9, n_filters * 1, kernel_size = 3, batchnorm = batchnorm)
-    
-    outputs = Conv2D(n_classes, (1, 1), activation='softmax')(c9)
-    model = Model(inputs=[input_img], outputs=[outputs])
-    return model
-
-# %%
 from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, Activation, MaxPooling2D, Dropout, Conv2DTranspose, concatenate
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.metrics import FalseNegatives, FalsePositives, TrueNegatives, TruePositives
 
+batch_size = 32
+epochs = 2
+validation_split = 1/5
 
-input_img = Input(shape=(128,128,3))
-model = get_unet(input_img, n_filters = 32, dropout = 0.0, batchnorm = True, n_classes = 1)
 
 # %% [markdown]
 # ## Task 1.2 Train the model, and plot the training history
 # Feel free to use the `plot_training_history` function from the provided library `utilities.py`
 
 # %%
-batch_size = 64
-epochs = 10
 
-# Create a validation split
-validation_split = 1/6
 
-# Compile the model
-model.compile(optimizer=Adam(learning_rate=0.001),
-              loss='binary_crossentropy',
-              metrics=[FalseNegatives(),
-                       FalsePositives(),
-                       TrueNegatives(),
-                       TruePositives(),
-                       F1_score])
-# Train the model
-start_time = time.time()
-history = model.fit(X_train, y_train, 
-                    batch_size=batch_size, 
-                    epochs=epochs, 
-                    validation_split=validation_split)
-end_time = time.time()
-elapsed_time = end_time - start_time
-print(f"Training took {elapsed_time:.5f} seconds.")
+# Get the current working directory
+current_directory = os.getcwd()
 
-model.save("/mnt/users/dat300-h23-40/ca3/models/model.keras")
+# Define the substring you want to check for
+substring = "dat300-h23-40"
+
+# Check if the substring is in the current working directory
+if substring in current_directory:
+    MODEL_PATH = "/mnt/users/dat300-h23-40/ca3/models/model.keras"
+    PICTURE_PATH = "/mnt/users/dat300-h23-40/ca3/models/model.png"
+    batch_size = 128
+    epochs = 40
+else:
+    MODEL_PATH = "../models/model.keras"
+    PICTURE_PATH = "../models/model.png"
 
 
 # %% [markdown]
 # ## Task 1.3 Visualize model predictions
 # 
 # Make a plot that illustrates the original image, the predicted mask, and the ground truth mask. 
+
 
 # %% [markdown]
 # # Part 2: Implementing U-net with transfer learning
@@ -280,6 +243,34 @@ model.save("/mnt/users/dat300-h23-40/ca3/models/model.keras")
 # Implement a U-net model utilizing the pre-trained weights of a publically available network. **Remember to compile with the F1-score metric**.
 
 # %%
+pre_trained_model = ks.applications.resnet50.ResNet50(include_top=False, weights='imagenet', input_shape=(128, 128, 3))
+
+for layer in pre_trained_model.layers:
+    layer.trainable = False
+
+model_with_pretrain = ks.models.Sequential()
+model_with_pretrain.add(pre_trained_model)
+model_with_pretrain.add(ks.layers.Conv2DTranspose(512, 2, strides=(2, 2), padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(512, 3, activation='relu', padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(512, 3, activation='relu', padding='same'))
+model_with_pretrain.add(ks.layers.Conv2DTranspose(256, 2, strides=(2, 2), padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(256, 3, activation='relu', padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(256, 3, activation='relu', padding='same'))
+model_with_pretrain.add(ks.layers.Conv2DTranspose(128, 2, strides=(2, 2), padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(128, 3, activation='relu', padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(128, 3, activation='relu', padding='same'))
+model_with_pretrain.add(ks.layers.Conv2DTranspose(64, 2, strides=(2, 2), padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(64, 3, activation='relu', padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(64, 3, activation='relu', padding='same'))
+model_with_pretrain.add(ks.layers.Conv2DTranspose(32, 2, strides=(2, 2), padding='same'))
+model_with_pretrain.add(ks.layers.Conv2D(1, 1, activation='sigmoid', padding='same'))
+
+# Compile the model with appropriate loss function and metrics
+model_with_pretrain.compile(optimizer=Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=[FalseNegatives(),
+                    FalsePositives(),
+                    TrueNegatives(),
+                    TruePositives(),
+                    F1_score])
 
 
 # %% [markdown]
@@ -288,67 +279,38 @@ model.save("/mnt/users/dat300-h23-40/ca3/models/model.keras")
 # Feel free to use the `plot_training_history` function from the provided library `utilities.py`
 
 # %%
+#Using the same number of epochs and batch size as before, train the model with the pre-trained weights. 
+start_time = time.time()
+history_pre_trained = model_with_pretrain.fit(X_train, y_train, 
+                                                batch_size=batch_size, 
+                                                epochs=epochs, 
+                                                validation_split=validation_split,
+                                                #mute the training output
+                                                verbose=0)
 
+end_time = time.time()
+elapsed_time = end_time - start_time
 
-# %% [markdown]
-# # Part 3: Training your model Orion
-# 
-# Use the lecture slides from the Orion-lecture to get started.
-# 1. Put one of your model implementations into a python script (`.py`)
-# 2. Transfer that script to Orion.
-# 3. Change the relevant path variables in your python script (path-to-data for example), and make sure that you record the time it takes to train the model in the script. This can be done using the `time` library for example.
-# 4. Set up a SLURM-script to train your model, please use the example from the Orion lecture as a base.
-# 5. Submit your SLURM job, and let the magic happen. 
-# 
-# If you wish to use a model trained on Orion to make a Kaggle submission, remeber to save the model, such that you can transfer it to your local computer to make a prediction on `X_test`, or test the model on Orion directly if you want to. 
-# 
-# ## Tips
-# 
-# If you compiled, trained and stored a model on Orion with a custom performance metric (such as F1-score), remember to specify that metric when loading the model on your computer again.
-# 
-# Loading a saved model:
-# ```python
-# trained_model = tf.keras.models.load_model('some/path/to/my_trained_model.keras', custom_objects={'F1_score': F1_score})
-# ```
-# 
-# Loading a checkpoint:
-# ```python
-# trained_model = tf.keras.saving.load_model('some/path/to/my_trained_model_checkpoint', custom_objects={'F1_score': F1_score})
-# ```
+print(f"Training took {elapsed_time:.5f} seconds.")
+print(f"Per epoch: {elapsed_time/epochs:.5f} seconds.")
 
-# %% [markdown]
-# # Discussion
-# 
-# **Question 1: Which model architectures did you explore, and what type of hyperparameter optimization did you try?**
-# 
-# **Answer 1:**
-# 
-# **Question 2: Which of the model(s) did you choose to train on Orion, and how long did it take to train it on Orion?**
-# 
-# **Answer 2:**
-# 
-# **Question 3: What where the biggest challenges with this assignment?**
-# 
-# **Answer 3:**
-
-# %% [markdown]
-# # Kaggle submission
-# 
-# Evaluate your best model on the test dataset and submit your prediction to the Kaggle leaderboard.
-# Link to the Kaggle leaderboard will be posted in the Canvas assignment.
+model_with_pretrain.save(MODEL_PATH)
 
 # %%
-y_pred = model.predict(X_test)
+print(history_pre_trained.history.keys())
+plot_training_history_and_return(history_pre_trained).savefig(PICTURE_PATH)
 
-flat_y_pred = y_pred.flatten() # Flatten prediction
-flat_y_pred[flat_y_pred >= THRESHOLD] = 1 # Binarize prediction (Optional, depends on output activation used)
-flat_y_pred[flat_y_pred != 1]   = 0 # Binarize prediction (Optional, depends on output activation used)
+
+# Flatten prediction
+y_pred      = model_with_pretrain.predict(X_test)                       # Make prediction
+flat_y_pred = y_pred.flatten()                            # Flatten prediction
+flat_y_pred[flat_y_pred >= 0.5] = 1 # Binarize prediction (Optional, depends on output activation used)
+flat_y_pred[flat_y_pred != 1]   = 0                       # Binarize prediction (Optional, depends on output activation used)
 submissionDF = pd.DataFrame()
-submissionDF['ID'] = range(len(flat_y_pred)) # The submission csv file must have a column called 'ID'
+submissionDF['ID'] = range(len(flat_y_pred))              # The submission csv file must have a column called 'ID'
 submissionDF['Prediction'] = flat_y_pred
-submissionDF.to_csv('submission.csv', index=False) # Remember to store the dataframe to csv without the nameless index column.
-
-# %%
-
+print("-"*25)
+print(submissionDF)
+submissionDF.to_csv('submission_newtest.csv', index=False)   
 
 
