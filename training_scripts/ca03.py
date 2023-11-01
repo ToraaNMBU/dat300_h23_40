@@ -154,43 +154,6 @@ X_train = X_train.astype("float32") / max_pixel_value
 X_test = X_test.astype("float32") / max_pixel_value
 
 
-# %% [markdown]
-# # Part 1: Implementing U-net
-# 
-# ## Intersection over Union
-# 
-# The IoU score is a popular metric in both segmentation and object detection problems. 
-# 
-# If you want to use the `plot_training_history` function in the `visualization.py` library remember to compile the model with the TP, TN, FP, FN metrics such that you can estimate the *Intersection-over-Union*. **However, it is voluntary to estimate IoU**
-# 
-# See example below:
-# 
-# ```python
-# from tensorflow.keras.metrics import FalseNegatives, FalsePositives, TrueNegatives, TruePositives
-# from utilities import F1_score, 
-# from visualization import plot_training_history, 
-# ...
-# model.compile(optimizer='Something', 
-#                   loss='Something else', 
-#                   metrics=[FalseNegatives(),
-#                            FalsePositives(),
-#                            TrueNegatives(),
-#                            TruePositives(),
-#                            F1_score,
-#                            OtherMetricOfChoice])
-# 
-# training_history = model.fit(X_train, y_train, ...)
-# plot_training_history(training_history)
-# ```
-# 
-# You have also been provided with a custom F1-score metric in the `utilities.py` library, which is specific for image segmentation. **This is mandatory to use when compiling the model**.
-
-# %% [markdown]
-# 
-# ## Task 1.1 Model implementation
-# 
-# Implement the classical U-net structure that you have learned about in the lectures. Feel free to experiment with the number of layers, loss-function, batch-normalization, etc. **Remember to compile with the F1-score metric**. 
-# 
 
 # %%
 from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, Activation, MaxPooling2D, Dropout, Conv2DTranspose, concatenate
@@ -227,22 +190,6 @@ else:
     PICTURE_PATH = "../models/model.png"
 
 
-# %% [markdown]
-# ## Task 1.3 Visualize model predictions
-# 
-# Make a plot that illustrates the original image, the predicted mask, and the ground truth mask. 
-
-
-# %% [markdown]
-# # Part 2: Implementing U-net with transfer learning
-# 
-# Implement a model with the U-net structure that you have learned about in the lectures, but now with a pre-trained backbone. There are many pre-trained back-bones to choose from. Pick freely from the selection here [tf.keras.applications](https://www.tensorflow.org/api_docs/python/tf/keras/applications), or here [Keras model scores](https://keras.io/api/applications/) (nicer table in the second link). Feel free to experiment with the number of layers, loss-function, batch-normalization, etc. Many of the backbones available are quite big, so you might find it quite time-consuming to train them on your personal computers. It might be expedient to only train them for 1-5 epochs on your PCs, and do the full training on Orion in Part 3. 
-# 
-# ## Task 2.1 Transfer learning model implementation
-# 
-# Implement a U-net model utilizing the pre-trained weights of a publically available network. **Remember to compile with the F1-score metric**.
-
-# %%
 pre_trained_model = ks.applications.resnet50.ResNet50(include_top=False, weights='imagenet', input_shape=(128, 128, 3))
 
 for layer in pre_trained_model.layers:
@@ -311,6 +258,6 @@ submissionDF['ID'] = range(len(flat_y_pred))              # The submission csv f
 submissionDF['Prediction'] = flat_y_pred
 print("-"*25)
 print(submissionDF)
-submissionDF.to_csv('submission_newtest.csv', index=False)   
+submissionDF.to_csv('submission.csv', index=False)   
 
 
