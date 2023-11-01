@@ -246,7 +246,7 @@ model_with_pretrain.save(MODEL_PATH)
 # %%
 print(history_pre_trained.history.keys())
 plot_training_history_and_return(history_pre_trained).savefig(PICTURE_PATH)
-
+# %%
 
 # Flatten prediction
 y_pred      = model_with_pretrain.predict(X_test)                       # Make prediction
@@ -256,8 +256,5 @@ flat_y_pred[flat_y_pred != 1]   = 0                       # Binarize prediction 
 submissionDF = pd.DataFrame()
 submissionDF['ID'] = range(len(flat_y_pred))              # The submission csv file must have a column called 'ID'
 submissionDF['Prediction'] = flat_y_pred
-print("-"*25)
-print(submissionDF)
-submissionDF.to_csv('submission.csv', index=False)   
 
 
